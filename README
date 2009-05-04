@@ -1,0 +1,9 @@
+RUBY-GCAL
+
+A Ruby library for the Google Calendar API.  ruby-gcal makes use of GData's 
+batch processing features, allowing you to add/update/delete multiple events
+with a single HTTP request.
+
+RUNNING THE TESTS:
+For now, in order to make the tests pass, you must add valid auth tokens to
+session_test.rb's setup method.
