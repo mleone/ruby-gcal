@@ -48,26 +48,11 @@ module GCal
       end
     end
 
-    def handle_calendar_list_request(feed_url)
-      begin
-        resp = NetRedirector::get(@http, feed_url, headers)
-      rescue Net::HTTPServerException => e
-        case e.response
-        when Net::HTTPForbidden
-          raise GCal::NoSetupError
-        when Net::HTTPUnauthorized
-          raise GCal::TokenRevoked
-        else
-          raise
-        end
-      end
-    end
-
     # Returns an array of calendar hashes or false if we need a new auth token.
     def get_calendar_list(opts = {})
       feed_url = opts[:all_calendars] ? ALL_CALENDARS_PATH : OWNED_CALENDARS_PATH
 
-      response = handle_calendar_list_request(feed_url)
+      response = handle_calendar_list_request feed_url
       doc = REXML::Document.new(response.read_body)
 
       doc.elements.to_a("*/entry").collect{ |feed| Calendar.new feed }
@@ -195,6 +180,19 @@ module GCal
       end
 
       calls
+    end
+    
+    def handle_calendar_list_request(feed_url)
+      NetRedirector::get(@http, feed_url, headers)
+    rescue Net::HTTPServerException => e
+      case e.response
+      when Net::HTTPForbidden
+        raise GCal::NoSetupError
+      when Net::HTTPUnauthorized
+        raise GCal::TokenRevoked
+      else
+        raise
+      end
     end
 
     def batch_request_xml
