@@ -5,5 +5,13 @@ batch processing features, allowing you to add/update/delete multiple events
 with a single HTTP request.
 
 RUNNING THE TESTS:
-For now, in order to make the tests pass, you must add valid auth tokens to
-session_test.rb's setup method.
+For now, in order to make the tests pass, you must add valid auth tokens
+as test data.
+
+1.  Copy test/calendar_tokens.yml.example to test/calendar_tokens.yml
+2.  Edit the file to contain strings of valid authsub tokens:
+      :normal_account_token should be from a Google account with Google Calendar
+        set up.
+      :no_setup_account_token should be from a Google account which has never 
+        been logged into the Google Calendar app.
+ 

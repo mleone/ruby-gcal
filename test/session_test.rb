@@ -1,4 +1,5 @@
 require 'test/unit'
+require 'yaml'
 require File.dirname(__FILE__) + '/../lib/gcal'
 
 class SessionTest < Test::Unit::TestCase
@@ -15,20 +16,21 @@ class SessionTest < Test::Unit::TestCase
     event
   end
 
+  CONFIG = YAML.load_file(
+    File.join(File.dirname(__FILE__), "calendar_tokens.yml"))
 
-  # TO MAKE TESTS PASS, ADD TOKENS HERE.
-  # For @sess, use a valid auth token from a Google account with Google Calendar
-  # set up.
-  # For @no_gcal_setup_sess, use a valid auth token from a Google account
-  # which has never been logged into the Google Calendar app.
   def setup
-    @sess = GCal::Session.new("")
-    @no_gcal_setup_sess = GCal::Session.new("")
+    @sess = GCal::Session.new CONFIG[:normal_account_token]
+    @no_gcal_setup_sess = GCal::Session.new CONFIG[:no_setup_account_token]
   end
 
   def test_get_calendar_list
-    list = @sess.get_calendar_list.map{|feed|feed.class}.uniq
-    assert(list.length == 1 && list.first == Hash)
+    list = @sess.get_calendar_list
+    assert !list.empty?
+    list.each do |cal|
+      assert cal.edit_path.is_a?(String)
+      assert cal.path.is_a?(String)
+    end
   end
 
   def test_get_session_token_with_bad_token
@@ -50,24 +52,31 @@ class SessionTest < Test::Unit::TestCase
   def test_add_and_delete_calendar
     calendar_title = "Unit Test: #{Time.now.to_s}"
     cal = GCal::Calendar.new
+
     cal.title = calendar_title
     cal.summary = "A great unit test calendar."
     cal.time_zone = "America/New_York"
 
     assert_kind_of String, @sess.add_calendar(cal)
-    
+
+    # ensure gdata lag doesn't cause the following test to fail;
+    # we want the just-added calendar to show up on the calendar list.
+    sleep 0.5 
+
     list = @sess.get_calendar_list
-    list_length_after_add = list.length
-    sleep 0.2 # ensure gdata lag doesn't cause the following test to fail.
-
-    assert list.any?{ |cal| cal[:title] == calendar_title }
-
-    # delete all calendars:
-    assert_nothing_raised do
-      list.each{|cal|@sess.delete_calendar(cal[:edit])}
+    returned_cal = list.detect do |cal| 
+      cal.title == calendar_title
     end
 
-    assert @sess.get_calendar_list.length < list_length_after_add
+    assert_equal returned_cal.title, calendar_title
+    assert_equal returned_cal.summary, "A great unit test calendar."
+
+    # delete the new calendar:
+    assert_nothing_raised do
+      @sess.delete_calendar returned_cal
+    end
+
+    assert @sess.get_calendar_list.length < list.length
   end
 
 

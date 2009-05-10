@@ -21,7 +21,6 @@ module GCal
     GCAL_COLOR = "#528800"
 
     attr_accessor :http
-    attr_reader   :master_time_zone
 
     # Create a new Session object
     def initialize(token) 
@@ -31,19 +30,14 @@ module GCal
     
     #return feed url for that calendar
     def add_calendar(calendar)
-      unless calendar.time_zone
-        get_calendar_list unless @master_time_zone
-        calendar.time_zone = @master_time_zone
-      end
-      
       xml_text = calendar.to_xml.to_s
       resp = NetRedirector::post(@http, OWNED_CALENDARS_PATH, xml_text, headers)
       calendar.process_add_response(resp)
     end
 
-    def delete_calendar(calendar_path)
+    def delete_calendar(calendar)
       begin  
-        NetRedirector.delete(@http, calendar_path, headers)
+        NetRedirector.delete(@http, calendar.edit_path, headers)
       rescue Net::HTTPServerException => e
         case e.response
         when Net::HTTPBadRequest
@@ -54,10 +48,7 @@ module GCal
       end
     end
 
-    # Returns an array of calendar hashes or false if we need a new auth token.
-    def get_calendar_list(opts = {})
-      feed_url = opts[:all_calendars] ? ALL_CALENDARS_PATH : OWNED_CALENDARS_PATH
-
+    def handle_calendar_list_request(feed_url)
       begin
         resp = NetRedirector::get(@http, feed_url, headers)
       rescue Net::HTTPServerException => e
@@ -70,27 +61,16 @@ module GCal
           raise
         end
       end
+    end
 
-      doc = REXML::Document.new resp.read_body
+    # Returns an array of calendar hashes or false if we need a new auth token.
+    def get_calendar_list(opts = {})
+      feed_url = opts[:all_calendars] ? ALL_CALENDARS_PATH : OWNED_CALENDARS_PATH
 
-      feeds = doc.elements.to_a("*/entry")
+      response = handle_calendar_list_request(feed_url)
+      doc = REXML::Document.new(response.read_body)
 
-      master_tz_element = feeds.detect do |e|
-        e.elements["gCal:timezone"] &&
-        e.elements["gCal:accesslevel"].attributes["value"] == "owner"
-      end
-
-      @master_time_zone = master_tz_element.elements["gCal:timezone"].attributes["value"]
-
-      return feeds.collect { |e|
-        edit_attr = e.elements.to_a("./link").detect do |link|
-          link.attributes["rel"] == "edit"
-        end 
-        { :title => e.elements["title"].text,
-          :url => URI.parse(e.elements["link"].attributes["href"]).path,
-          :edit => URI.parse(edit_attr.attributes["href"]).path
-        }
-      }
+      doc.elements.to_a("*/entry").collect{ |feed| Calendar.new feed }
     end
   
     #takes an array of hashes containing api call instructions
