@@ -36,32 +36,28 @@ module GCal
     end
 
     def delete_calendar(calendar)
-      begin  
-        NetRedirector.delete(@http, calendar.edit_path, headers)
-      rescue Net::HTTPServerException => e
-        case e.response
-        when Net::HTTPBadRequest
-          return nil # Can't delete calendar; probably user's primary cal.
-        else
-          raise
-        end
+      NetRedirector.delete(@http, calendar.edit_path, headers)
+    rescue Net::HTTPServerException => e
+      case e.response
+      when Net::HTTPBadRequest
+        return nil # Can't delete calendar; probably user's primary cal.
+      else
+        raise
       end
     end
 
     # Returns an array of calendar hashes or false if we need a new auth token.
     def get_calendar_list(opts = {})
       feed_url = opts[:all_calendars] ? ALL_CALENDARS_PATH : OWNED_CALENDARS_PATH
-
       response = handle_calendar_list_request feed_url
       doc = REXML::Document.new(response.read_body)
-
       doc.elements.to_a("*/entry").collect{ |feed| Calendar.new feed }
     end
   
     #takes an array of hashes containing api call instructions
     #each hash should have the following:
     # :operation - :insert, :update or :delete
-    # :event - the ExternalEvent object
+    # :event - the event object
     def batch_request(calls, feed_url = PRIVATE_CALENDARS_PATH)
       results = []
       calls.uniq.each_slice(MAX_BATCH_REQUEST_SIZE) do |call_set|

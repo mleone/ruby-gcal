@@ -12,14 +12,17 @@ module GCal
       "xmlns:gCal"  => 'http://schemas.google.com/gCal/2005'})
     
     def initialize(xml_element=nil)
-      @xml = xml_element
-      if @xml
+      generate_from_xml! xml_element
+    end
+
+    def generate_from_xml!(xml_element)
+      if @xml = xml_element
         @title      = extract_title
         @summary    = extract_summary
         @path       = extract_path
         @edit_path  = extract_edit_path
         @time_zone  = extract_time_zone
-      end
+      end 
     end
 
     def to_xml
@@ -35,10 +38,9 @@ module GCal
     def process_add_response(resp)
       case resp
         when Net::HTTPSuccess
-          doc = REXML::Document.new resp.read_body
-          calendar_url =  doc.elements["entry"].elements["link"].attributes["href"]
-          @path = URI.parse(calendar_url).path
-          return @path
+          entry = REXML::Document.new(resp.read_body).elements["entry"]
+          self.generate_from_xml! entry
+          @path
         else
           raise GCal::Error, "Couldn't add calendar!  Are you authenticated?"
       end
