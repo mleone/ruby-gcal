@@ -61,7 +61,7 @@ class SessionTest < Test::Unit::TestCase
 
     # ensure gdata lag doesn't cause the following test to fail;
     # we want the just-added calendar to show up on the calendar list.
-    sleep 0.5 
+    sleep 1 
 
     list = @sess.get_calendar_list
     returned_cal = list.detect do |cal| 

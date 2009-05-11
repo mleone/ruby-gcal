@@ -77,7 +77,7 @@ module GCal
 
     def do_batch_request(calls, feed_url)
       feed_url += '/batch'
-      xml = batch_request_xml
+      xml = BatchRequest.new.to_xml
       calls = get_fresh_edit_links(calls, feed_url)
       calls.each_with_index do |request, i|
         unless VALID_BATCH_OPS.include? request[:operation]
@@ -115,7 +115,7 @@ module GCal
     # takes an array of api call instructions and adds valid edit links based on
     # google event IDs
     def get_fresh_edit_links(calls, feed_url)
-      xml = batch_request_xml
+      xml = BatchRequest.new.to_xml
       # build batch request for all deletes/updates
       calls.each_with_index do |request, i|
         next if request[:operation] == :insert
@@ -189,14 +189,6 @@ module GCal
       else
         raise
       end
-    end
-
-    def batch_request_xml
-      xml = REXML::Element.new("feed")
-      xml.add_attributes({  "xmlns" => 'http://www.w3.org/2005/Atom',
-                            "xmlns:batch" => 'http://schemas.google.com/gdata/batch',
-                            "xmlns:gCal" => 'http://schemas.google.com/gCal/2005'})
-      xml
     end
   end
 end

@@ -1,8 +1,10 @@
 module GCal
+ 
   require 'rexml/document'
-  require File.join(File.dirname(__FILE__), 'gcal/event')
-  require File.join(File.dirname(__FILE__), 'gcal/calendar')
-  require File.join(File.dirname(__FILE__), 'gcal/session')
+  
+  # require select libs from the gcal directory 
+  LIBS = %w(event calendar session batch_request).freeze
+  LIBS.each{|lib| require File.join(File.dirname(__FILE__), "gcal/#{lib}")}
   
   HOME_URL = 'http://calendar.google.com'
 
