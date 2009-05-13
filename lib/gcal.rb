@@ -15,6 +15,9 @@ module GCal
 
   class Error < RuntimeError; end
   class TokenInvalidError < RuntimeError; end
+  class CalendarInvalidError < RuntimeError; end
+  class NoSetupError < RuntimeError; end
+  class TokenRevoked < RuntimeError; end
 
   class << self
     def get_session_token(auth_token)

@@ -44,7 +44,7 @@ class SessionTest < Test::Unit::TestCase
     cal.title = calendar_title
     cal.summary = "A great unit test calendar."
     cal.time_zone = "America/New_York"
-
+    
     assert_kind_of String, @sess.add_calendar(cal)
 
     list = @sess.get_calendar_list

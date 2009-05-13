@@ -10,7 +10,30 @@ module GCal
       "xmlns"       => 'http://www.w3.org/2005/Atom',
       "xmlns:gd"    => 'http://schemas.google.com/g/2005',
       "xmlns:gCal"  => 'http://schemas.google.com/gCal/2005'})
+  
+    class << self
+      def list_all_for_feed(feed_url, http, headers)
+        response = process_list_request(http, feed_url, headers)
+        doc = REXML::Document.new(response.read_body)
+        doc.elements.to_a("*/entry").collect{ |feed| self.new feed }
+      end
+
+      private
     
+      def process_list_request(http, feed_url, headers)
+        NetRedirector.get(http, feed_url, headers)
+      rescue Net::HTTPServerException => e
+        case e.response
+          when Net::HTTPForbidden
+            raise GCal::NoSetupError
+          when Net::HTTPUnauthorized
+            raise GCal::TokenRevoked
+          else
+            raise
+        end
+      end
+    end
+  
     def initialize(xml_element=nil)
       generate_from_xml! xml_element
     end

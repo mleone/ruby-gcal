@@ -5,10 +5,6 @@ require 'enumerator'
 require File.join(File.dirname(__FILE__), 'net_redirector')
 
 module GCal
-  class CalendarInvalidError < RuntimeError; end
-  class NoSetupError < RuntimeError; end
-  class TokenRevoked < RuntimeError; end
-  
   class Session
     MAX_BATCH_REQUEST_SIZE = 50
     
@@ -49,9 +45,7 @@ module GCal
     # Returns an array of calendar hashes or false if we need a new auth token.
     def get_calendar_list(opts = {})
       feed_url = opts[:all_calendars] ? ALL_CALENDARS_PATH : OWNED_CALENDARS_PATH
-      response = handle_calendar_list_request feed_url
-      doc = REXML::Document.new(response.read_body)
-      doc.elements.to_a("*/entry").collect{ |feed| Calendar.new feed }
+      Calendar.list_all_for_feed feed_url, @http, headers
     end
   
     #takes an array of hashes containing api call instructions
@@ -149,18 +143,6 @@ module GCal
       calls
     end
     
-    def handle_calendar_list_request(feed_url)
-      NetRedirector::get(@http, feed_url, headers)
-    rescue Net::HTTPServerException => e
-      case e.response
-      when Net::HTTPForbidden
-        raise GCal::NoSetupError
-      when Net::HTTPUnauthorized
-        raise GCal::TokenRevoked
-      else
-        raise
-      end
-    end
   end
 end
 
