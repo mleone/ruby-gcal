@@ -11,7 +11,7 @@ module GCal
   
   class Session
     MAX_BATCH_REQUEST_SIZE = 50
-    VALID_BATCH_OPS = [:update, :insert, :delete, :query]
+    
     SUCCESSFUL_BATCH_STATUSES = [200, 201]
     UNSUCCESSFUL_BATCH_STATUSES = [404, 500]
     INVALID_CALENDAR_STATUS = 403
@@ -77,36 +77,16 @@ module GCal
 
     def do_batch_request(calls, feed_url)
       feed_url += '/batch'
-      xml = BatchRequest.new.to_xml
+      batch_request = BatchRequest.new
       calls = get_fresh_edit_links(calls, feed_url)
-      calls.each_with_index do |request, i|
-        unless VALID_BATCH_OPS.include? request[:operation]
-          raise ArgumentError, "Invalid batch operation", caller
-        end
-        entry = request[:event].to_xml
-        batch_id = entry.add_element("batch:id")
-        batch_id.text = i
-        entry.add_element( "batch:operation",
-                          {"type" => request[:operation].to_s})
-        unless request[:operation] == :insert
-          id = entry.add_element "id"
-          id.text = request[:event].google_id
-        end
-        case request[:operation]
-        when :update, :delete
-          entry.add_element(  "link",
-                          { "rel" => "edit",
-                            "type" => 'application/atom+xml',
-                            "href" => request[:edit_link].to_s
-                          })
-        end
-        xml.add_element entry
+      calls.each_with_index do |request, i|  
+        batch_request.add_entry request[:event], request[:operation], i
       end
-      resp = NetRedirector::post(@http, feed_url, xml.to_s, headers)
+      resp = NetRedirector::post(@http, feed_url, batch_request.to_xml.to_s, headers)
       case resp
       when Net::HTTPSuccess
         doc = REXML::Document.new resp.read_body
-        return parse_batch_feed(doc, calls, xml.to_s)
+        return parse_batch_feed(doc, calls, batch_request.to_xml.to_s)
       else
         raise GCal::Error, "Could not complete batch request!  Are you properly authenticated?"
       end
@@ -115,19 +95,14 @@ module GCal
     # takes an array of api call instructions and adds valid edit links based on
     # google event IDs
     def get_fresh_edit_links(calls, feed_url)
-      xml = BatchRequest.new.to_xml
-      # build batch request for all deletes/updates
+      batch_request = BatchRequest.new
+      # build batch query request for all deletes/updates
       calls.each_with_index do |request, i|
         next if request[:operation] == :insert
-        entry = xml.add_element("entry")
-        id = entry.add_element "id"
-        id.text = request[:event].google_id
-        batch = entry.add_element("batch:id")
-        batch.text = i
-        entry.add_element("batch:operation", {"type" => "query"})
+        batch_request.add_entry request[:event], :query, i
       end
 
-      resp = NetRedirector::post(@http, feed_url, xml.to_s, headers)
+      resp = NetRedirector.post(@http, feed_url, batch_request.to_xml.to_s, headers)
       case resp
       when Net::HTTPSuccess
         doc = REXML::Document.new resp.read_body
@@ -141,7 +116,7 @@ module GCal
           # will give more useful info than raising an error here.
           link = edit_tag.nil? ?  e.elements['atom:id'].text :
             edit_tag.attributes['href']
-          calls[index].merge! :edit_link => link
+          calls[index][:event].edit_link = link
         end
       else
         raise GCal::Error, "Could not get edit links!"
@@ -165,13 +140,9 @@ module GCal
         pass = SUCCESSFUL_BATCH_STATUSES.include?(status)
         request = calls[index]
         request.merge! :pass => pass
+        request.merge! :full_feed => xml_feed
         if request[:operation] == :insert and pass
           request[:event].google_id = e.elements['atom:id'].text
-        end
-        if e.elements["gd:when"]
-          request.merge!({
-              :starts_at => e.elements["gd:when"].attributes["startTime"],
-              :ends_at => e.elements["gd:when"].attributes["endTime"]})
         end
       end
 

@@ -4,18 +4,6 @@ require File.dirname(__FILE__) + '/../lib/gcal'
 
 class SessionTest < Test::Unit::TestCase
   
-  # generate 10 unique gcal events:
-  EVENTS = (1..10).map do |uid| 
-    event = GCal::Event.new
-    event.title = "party #{uid}!"
-    event.description = "fun times"
-    event.location = "right over here"
-    event.starts_at = Time.now
-    event.ends_at = Time.now + (10_000 * uid) 
-    event.transparent = false
-    event
-  end
-
   CONFIG = YAML.load_file(
     File.join(File.dirname(__FILE__), "calendar_tokens.yml"))
 
@@ -43,7 +31,7 @@ class SessionTest < Test::Unit::TestCase
   
   def test_batch_request_with_invalid_calendar
     fake_path = '/calendar/feeds/f1ko4%40group.calendar.google.com/private/full'
-    requests = [make_request(EVENTS.first, :insert)]
+    requests = [make_request(generate_events(1).first, :insert)]
     assert_raise(GCal::CalendarInvalidError) do
       @sess.batch_request(requests, fake_path)
     end
@@ -58,10 +46,6 @@ class SessionTest < Test::Unit::TestCase
     cal.time_zone = "America/New_York"
 
     assert_kind_of String, @sess.add_calendar(cal)
-
-    # ensure gdata lag doesn't cause the following test to fail;
-    # we want the just-added calendar to show up on the calendar list.
-    sleep 1 
 
     list = @sess.get_calendar_list
     returned_cal = list.detect do |cal| 
@@ -81,16 +65,16 @@ class SessionTest < Test::Unit::TestCase
 
 
   def test_insert_event
-    gcal_event = EVENTS.first
+    gcal_event = generate_events(1).first
     request = [make_request(gcal_event, :insert)]
     result = @sess.batch_request(request)
     assert result.first[:pass]
-    
+   
     returned_event = result.first[:event] 
     request = [make_request(returned_event, :update)]
     result = @sess.batch_request(request)
     assert result.first[:pass]
-
+    
     returned_event = result.first[:event] 
     request = [make_request(returned_event, :delete)]
     result = @sess.batch_request(request)
@@ -100,27 +84,28 @@ class SessionTest < Test::Unit::TestCase
   def test_batch_request
     requests = []
 
-    # add ten events:
-    EVENTS.each{|e| requests << make_request(e, :insert) }
+    test_events = generate_events(10)
+    
+    test_events.each{|e| requests << make_request(e, :insert) }
     results = []
     assert_nothing_raised{results = @sess.batch_request(requests)}
     assert results.all?{ |req| req[:pass] }
 
     # update the events:
     requests = []
-    EVENTS.each{|e|requests << make_request(e, :update)}
+    test_events.each{|e|requests << make_request(e, :update)}
     assert_nothing_raised{results = @sess.batch_request(requests)}
     assert results.all?{ |req| req[:pass] }
     
     # delete the events:
     requests = []
-    EVENTS.each{|e|requests << make_request(e, :delete)}
+    test_events.each{|e|requests << make_request(e, :delete)}
     assert_nothing_raised{results = @sess.batch_request(requests)}
     assert results.all?{ |req| req[:pass] }
 
     #ensure that we fail when attempting to delete these events again.
     requests = []
-    EVENTS.each{|e|requests << make_request(e, :delete)}
+    test_events.each{|e|requests << make_request(e, :delete)}
     assert_nothing_raised{results = @sess.batch_request(requests)}
     assert !results.any?{ |req| req[:pass] }
   end
@@ -131,5 +116,17 @@ class SessionTest < Test::Unit::TestCase
     { :event => event, :operation => kind }
   end
 
+  def generate_events(num_events)
+    (1..num_events).map do |uid| 
+      event = GCal::Event.new
+      event.title = "party #{uid}!"
+      event.description = "fun times"
+      event.location = "right over here"
+      event.starts_at = Time.now
+      event.ends_at = Time.now + (10_000 * uid) 
+      event.transparent = false
+      event
+    end
+  end
 end
 

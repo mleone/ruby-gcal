@@ -3,9 +3,11 @@ require 'erb'
 module GCal
   class Event
     attr_accessor :title, :description, :location, :starts_at, :ends_at, 
-      :transparent, :google_id
+      :transparent, :batch_id, :operation, :google_id, :edit_link
 
     class AttributeError < RuntimeError; end
+
+    VALID_OPERATIONS = [:update, :insert, :delete, :query]
 
     BASE_ENTRY = REXML::Element.new("entry")
     BASE_ENTRY.add_attributes({ 
@@ -24,6 +26,10 @@ module GCal
       set_start_and_end_times
       set_location     
       set_transparency
+      set_batch_id
+      set_operation
+      set_google_id
+      set_edit_link
       @xml
     end
 
@@ -74,6 +80,38 @@ module GCal
       transparency = @transparent ? 'transparent' : 'opaque'
       @xml.add_element "gd:transparency", {
         "value" => 'http://schemas.google.com/g/2005#event.' + transparency }
+    end
+
+    def set_batch_id
+      batch_id = @xml.add_element("batch:id")
+      batch_id.text = @batch_id
+    end
+
+    def set_operation
+      @xml.add_element("batch:operation", {"type" => @operation.to_s})
+    end
+
+    def set_google_id
+      if @google_id
+        g_id = @xml.add_element "id"
+        g_id.text = @google_id
+      end
+    end
+
+    def set_edit_link
+      if @edit_link
+        @xml.add_element("link", { 
+          "rel"   => "edit",
+          "type"  => 'application/atom+xml',
+          "href"  => @edit_link.to_s })
+      end
+    end
+
+    def validate_operation(operation)
+      unless VALID_OPERATIONS.include? operation
+        raise AttributeError, "Invalid batch operation", caller
+      end
+      true 
     end
   end
 end
